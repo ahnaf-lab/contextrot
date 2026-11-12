@@ -4,6 +4,9 @@
   "description": "Measures how badly a retrieval/QA prompt degrades as irrelevant filler is added, using deterministic local fixtures and a scorer.",
   "type": "module",
   "main": "src/index.js",
+  "bin": {
+    "contextrot-gate": "bin/gate.js"
+  },
   "scripts": {
     "test": "node --test"
   },

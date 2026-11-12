@@ -13,8 +13,10 @@ snapshot-tested and later gated on in CI. The scorer sits behind a small
 pluggable interface, so a real model-backed caller can swap in its own
 correctness judge without touching the sweep runner or breaking test mode.
 On top of that, a sparkline renderer turns a curve into a compact ASCII or
-SVG visualization for logs, docs, or CI output. Everything is covered by
-golden-output unit tests.
+SVG visualization for logs, docs, or CI output, and a gate helper (library
+function plus CLI) turns the curve into a pass/fail CI check against
+configured degradation bounds. Everything is covered by golden-output unit
+tests.
 
 ## Install
 
@@ -129,6 +131,45 @@ runSweep({ answer: myAnswerer, scorer: fuzzyScorer });
 
 If `scorer` is omitted, `runSweep` and `scoreBatch` both default to
 `exactMatch`, so existing deterministic test-mode behavior is unchanged.
+
+### CI gate
+
+Check a sweep result against configured degradation bounds and fail the
+build if the curve shape falls outside them. `checkGate` is a pure function
+of the curve and the bounds, so it has no network or file access of its own
+and is safe to unit test directly:
+
+```js
+import { runSweep, checkGate, formatGateReport } from './src/index.js';
+
+const result = runSweep({ answer: myAnswerer });
+
+const gate = checkGate(result, {
+  minAccuracy: 0.5,      // every point must stay at or above this floor
+  maxDrop: 0.4,           // no point may fall more than this far below the
+                          // baseline (the first point in the curve)
+  maxRelativeDrop: 0.5,  // no point may fall below this fraction of baseline
+});
+
+console.log(formatGateReport(gate)); // 'PASS: ...' or 'FAIL: N bound(s) ...'
+if (!gate.pass) process.exitCode = 1;
+```
+
+At least one of `minAccuracy`, `maxDrop`, or `maxRelativeDrop` must be
+given. `gate.violations` lists every bound that was crossed, with the
+`contextLength` and `accuracy` of the offending point, so a CI log can point
+straight at where the curve degraded.
+
+A small CLI wraps the same check around a JSON report written by
+`writeSweepReport`, for use directly in a CI step:
+
+```bash
+npx contextrot-gate sweep-report.json --min-accuracy 0.5 --max-relative-drop 0.5
+```
+
+It prints the curve's ASCII sparkline and a PASS/FAIL report, and exits `0`
+on pass, `1` when a bound is violated, or `2` on a usage/input error - so a
+CI pipeline can wire it in as a regression gate with no extra scripting.
 
 Run the test suite:
 
