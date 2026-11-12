@@ -3,3 +3,5 @@ export { FILLER_SENTENCES, buildHaystack } from './haystack.js';
 export { NEEDLE_WORDS, NEEDLE_QUESTION, createNeedle } from './needle.js';
 export { generateFixture } from './fixtures.js';
 export { normalize, exactMatch, scoreBatch } from './scorer.js';
+export { perfectAnswerer, lostInMiddleAnswerer } from './answerers.js';
+export { runSweep, sweepToJSON, writeSweepReport } from './sweep.js';

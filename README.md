@@ -5,8 +5,11 @@ retrieval/QA prompt degrades as you pad it with irrelevant filler text ("the
 lost in the middle" effect), using a deterministic local scorer so no API key
 or model call is ever required.
 
-This milestone provides the foundation: a seeded needle/haystack fixture
-generator and an exact-match scorer, both fully deterministic and covered by
+The foundation is a seeded needle/haystack fixture generator and an
+exact-match scorer, both fully deterministic. On top of that sits a sweep
+runner that scores a predictor across a range of context (haystack) lengths
+and records the resulting accuracy curve as plain JSON, so it can be
+snapshot-tested and later gated on in CI. Everything is covered by
 golden-output unit tests.
 
 ## Install
@@ -45,6 +48,35 @@ scoreBatch([
   { predicted: 'wrong', expected: 'amber-1234' },
 ]); // { accuracy: 0.5, results: [true, false] }
 ```
+
+Sweep a range of context lengths and record an accuracy curve:
+
+```js
+import { runSweep, sweepToJSON, lostInMiddleAnswerer } from './src/index.js';
+
+// `answer` is the predictor under test: given a fixture, it returns a
+// predicted answer string. Swap in a real model call here; for now,
+// `lostInMiddleAnswerer` is a deterministic stand-in that simulates
+// accuracy dropping off as filler grows and the needle sits mid-haystack,
+// so the sweep can be exercised and tested without any model or API key.
+const result = runSweep({
+  answer: lostInMiddleAnswerer,
+  contextLengths: [0, 10, 20, 50, 100], // haystack lengths to sweep
+  trialsPerLength: 8,                   // fixtures averaged per length
+  needleDepth: 0.5,
+  seed: 'my-sweep',
+});
+
+console.log(result.points);
+// [{ contextLength: 0, accuracy: 1, trials: 8 }, ...]
+
+console.log(sweepToJSON(result)); // same data as a JSON string
+```
+
+`runSweep` is deterministic: the same options always produce the same
+curve, which is what makes it safe to compare against a golden JSON
+snapshot in a test or CI gate. Use `writeSweepReport(filePath, result)` to
+write that JSON straight to a file.
 
 Run the test suite:
 
