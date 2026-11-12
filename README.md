@@ -12,7 +12,9 @@ and records the resulting accuracy curve as plain JSON, so it can be
 snapshot-tested and later gated on in CI. The scorer sits behind a small
 pluggable interface, so a real model-backed caller can swap in its own
 correctness judge without touching the sweep runner or breaking test mode.
-Everything is covered by golden-output unit tests.
+On top of that, a sparkline renderer turns a curve into a compact ASCII or
+SVG visualization for logs, docs, or CI output. Everything is covered by
+golden-output unit tests.
 
 ## Install
 
@@ -79,6 +81,28 @@ console.log(sweepToJSON(result)); // same data as a JSON string
 curve, which is what makes it safe to compare against a golden JSON
 snapshot in a test or CI gate. Use `writeSweepReport(filePath, result)` to
 write that JSON straight to a file.
+
+### Sparkline renderers
+
+Turn a sweep result into a compact visualization of the degradation curve,
+either as a one-line Unicode sparkline for logs/terminals or as a small SVG
+for docs/dashboards. Both are pure functions of the accuracy values, so the
+same curve always renders to the exact same string - safe to snapshot-test
+and gate on in CI.
+
+```js
+import { renderAsciiSparkline, renderSvgSparkline } from './src/index.js';
+
+renderAsciiSparkline(result); // '██▄▃▃' - one block per context length
+
+renderSvgSparkline(result, { width: 160, height: 32 });
+// '<svg xmlns="http://www.w3.org/2000/svg" ...><rect .../>...</svg>'
+```
+
+Each accuracy is quantized into 8 levels for the ASCII renderer (▁ lowest ..
+█ highest) and into a proportional bar height for the SVG renderer. Either
+function also accepts a plain array of accuracy numbers or `SweepPoint`
+objects directly, so they don't require a full `SweepResult`.
 
 ### Pluggable scorer
 

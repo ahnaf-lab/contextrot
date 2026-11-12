@@ -5,3 +5,4 @@ export { generateFixture } from './fixtures.js';
 export { normalize, exactMatch, containsMatch, scoreBatch } from './scorer.js';
 export { perfectAnswerer, lostInMiddleAnswerer } from './answerers.js';
 export { runSweep, sweepToJSON, writeSweepReport } from './sweep.js';
+export { renderAsciiSparkline, renderSvgSparkline } from './sparkline.js';
