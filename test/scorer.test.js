@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalize, exactMatch, scoreBatch } from '../src/scorer.js';
+import { normalize, exactMatch, containsMatch, scoreBatch } from '../src/scorer.js';
 
 test('normalize trims, lowercases, collapses whitespace, strips trailing punctuation', () => {
   assert.equal(normalize('  Amber-1234.  '), 'amber-1234');
@@ -30,4 +30,29 @@ test('scoreBatch returns 0 accuracy for an empty batch', () => {
   const { accuracy, results } = scoreBatch([]);
   assert.equal(accuracy, 0);
   assert.deepEqual(results, []);
+});
+
+test('containsMatch accepts a verbose answer that contains the expected value', () => {
+  assert.equal(containsMatch('The secret code is AMBER-1234, I believe.', 'amber-1234'), true);
+  assert.equal(containsMatch('amber-1234', 'amber-1234'), true);
+});
+
+test('containsMatch rejects an answer missing the expected value', () => {
+  assert.equal(containsMatch('The secret code is QUARTZ-5026.', 'amber-1234'), false);
+});
+
+test('scoreBatch accepts a pluggable scorer in place of the exact-match default', () => {
+  const { accuracy, results } = scoreBatch(
+    [
+      { predicted: 'the answer is amber-1234, for sure', expected: 'amber-1234' },
+      { predicted: 'no idea', expected: 'amber-1234' },
+    ],
+    containsMatch
+  );
+  assert.equal(accuracy, 0.5);
+  assert.deepEqual(results, [true, false]);
+});
+
+test('scoreBatch rejects a non-function scorer', () => {
+  assert.throws(() => scoreBatch([{ predicted: 'a', expected: 'a' }], 'not-a-function'), TypeError);
 });

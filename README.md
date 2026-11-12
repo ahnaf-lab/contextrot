@@ -9,8 +9,10 @@ The foundation is a seeded needle/haystack fixture generator and an
 exact-match scorer, both fully deterministic. On top of that sits a sweep
 runner that scores a predictor across a range of context (haystack) lengths
 and records the resulting accuracy curve as plain JSON, so it can be
-snapshot-tested and later gated on in CI. Everything is covered by
-golden-output unit tests.
+snapshot-tested and later gated on in CI. The scorer sits behind a small
+pluggable interface, so a real model-backed caller can swap in its own
+correctness judge without touching the sweep runner or breaking test mode.
+Everything is covered by golden-output unit tests.
 
 ## Install
 
@@ -77,6 +79,32 @@ console.log(sweepToJSON(result)); // same data as a JSON string
 curve, which is what makes it safe to compare against a golden JSON
 snapshot in a test or CI gate. Use `writeSweepReport(filePath, result)` to
 write that JSON straight to a file.
+
+### Pluggable scorer
+
+Correctness judging is a small interface - `(predicted, expected) => boolean`
+- not a hardcoded check, so a real model-backed caller can swap in its own
+scorer without changing `scoreBatch` or `runSweep`:
+
+```js
+import { runSweep, exactMatch, containsMatch } from './src/index.js';
+
+// Default: strict exact match (after trim/case/whitespace normalization).
+// This is what keeps test mode deterministic and API-key-free.
+runSweep({ answer: myAnswerer, scorer: exactMatch });
+
+// A real LLM often answers in a full sentence instead of a bare value
+// ("The code is AMBER-1234."). containsMatch tolerates that by checking
+// whether the expected answer appears anywhere in the prediction.
+runSweep({ answer: myLLMAnswerer, scorer: containsMatch });
+
+// Or bring your own: any function with this signature works.
+const fuzzyScorer = (predicted, expected) => /* your logic */ true;
+runSweep({ answer: myAnswerer, scorer: fuzzyScorer });
+```
+
+If `scorer` is omitted, `runSweep` and `scoreBatch` both default to
+`exactMatch`, so existing deterministic test-mode behavior is unchanged.
 
 Run the test suite:
 

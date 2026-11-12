@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { generateFixture } from './fixtures.js';
-import { scoreBatch } from './scorer.js';
+import { exactMatch, scoreBatch } from './scorer.js';
 
 /**
  * @typedef {Object} SweepPoint
@@ -32,6 +32,12 @@ import { scoreBatch } from './scorer.js';
  * @param {Object} options
  * @param {(fixture: import('./fixtures.js').Fixture) => string} options.answer
  *   predictor under test: given a fixture, returns a predicted answer
+ * @param {import('./scorer.js').Scorer} [options.scorer=exactMatch] -
+ *   pluggable correctness judge used to compare each predicted answer
+ *   against the fixture's expected answer. Defaults to the deterministic
+ *   exact-match scorer, which is what keeps test mode working without an
+ *   API key; a real LLM caller can pass a looser scorer (e.g.
+ *   `containsMatch`) to tolerate verbose answers instead.
  * @param {number[]} [options.contextLengths] - haystack lengths to sweep
  * @param {number} [options.trialsPerLength=5] - fixtures averaged per length
  * @param {number} [options.needleDepth=0.5] - needle depth for every fixture
@@ -41,6 +47,7 @@ import { scoreBatch } from './scorer.js';
 export function runSweep(options = {}) {
   const {
     answer,
+    scorer = exactMatch,
     contextLengths = [0, 10, 20, 50, 100],
     trialsPerLength = 5,
     needleDepth = 0.5,
@@ -49,6 +56,9 @@ export function runSweep(options = {}) {
 
   if (typeof answer !== 'function') {
     throw new TypeError('options.answer must be a function(fixture) => string');
+  }
+  if (typeof scorer !== 'function') {
+    throw new TypeError('options.scorer must be a function(predicted, expected) => boolean');
   }
   if (!Array.isArray(contextLengths) || contextLengths.length === 0) {
     throw new RangeError('options.contextLengths must be a non-empty array');
@@ -72,7 +82,7 @@ export function runSweep(options = {}) {
       pairs.push({ predicted: answer(fixture), expected: fixture.answer });
     }
 
-    const { accuracy } = scoreBatch(pairs);
+    const { accuracy } = scoreBatch(pairs, scorer);
     return { contextLength, accuracy, trials: trialsPerLength };
   });
 

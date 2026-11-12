@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runSweep, sweepToJSON, writeSweepReport } from '../src/sweep.js';
 import { perfectAnswerer, lostInMiddleAnswerer } from '../src/answerers.js';
+import { containsMatch } from '../src/scorer.js';
 
 test('runSweep with a perfect answerer stays at accuracy 1 across all lengths', () => {
   const result = runSweep({
@@ -67,6 +68,40 @@ test('runSweep uses default contextLengths and trialsPerLength when omitted', ()
 
 test('runSweep rejects a missing answer function', () => {
   assert.throws(() => runSweep({ contextLengths: [0] }), TypeError);
+});
+
+test('runSweep rejects a non-function scorer', () => {
+  assert.throws(
+    () => runSweep({ answer: perfectAnswerer, contextLengths: [0], scorer: 'not-a-function' }),
+    TypeError
+  );
+});
+
+test('runSweep accepts a pluggable scorer in place of the exact-match default', () => {
+  const verboseAnswerer = (fixture) => `I think the answer is ${fixture.answer}, probably.`;
+
+  const withExactMatch = runSweep({
+    answer: verboseAnswerer,
+    contextLengths: [0, 10],
+    trialsPerLength: 3,
+    seed: 'pluggable-scorer',
+  });
+  assert.deepEqual(
+    withExactMatch.points.map((p) => p.accuracy),
+    [0, 0]
+  );
+
+  const withContainsMatch = runSweep({
+    answer: verboseAnswerer,
+    scorer: containsMatch,
+    contextLengths: [0, 10],
+    trialsPerLength: 3,
+    seed: 'pluggable-scorer',
+  });
+  assert.deepEqual(
+    withContainsMatch.points.map((p) => p.accuracy),
+    [1, 1]
+  );
 });
 
 test('runSweep rejects an empty contextLengths array', () => {
